@@ -15,7 +15,7 @@ const app = express();
 const server = http.createServer(app);
 
 // 1. LIVE URL DEFINITION
-// Yahan humne aapka live Netlify link add kar diya hai
+// Yahan humne aapka exact live Netlify link dala hai
 const allowedOrigins = [
     "http://localhost:5173", 
     "https://aesthetic-klepon-7aa9d7.netlify.app" 
@@ -26,7 +26,8 @@ export const userSocketMap = {};
 export const io = new Server(server, {
     cors: { 
         origin: allowedOrigins, 
-        credentials: true 
+        credentials: true,
+        methods: ["GET", "POST"]
     }
 });
 
@@ -45,6 +46,7 @@ io.on("connection", (socket) => {
 
 // 3. Middlewares
 app.use(express.json({ limit: "5mb" }));
+// CORS Middleware jo frontend requests allow karega
 app.use(cors({ 
     origin: allowedOrigins, 
     credentials: true 
