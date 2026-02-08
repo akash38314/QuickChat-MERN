@@ -5,19 +5,23 @@ import cors from "cors";
 import { Server } from "socket.io";
 import http from "http";
 
-// Router Imports - Plural naming as per your explorer
-import userRouter from "./routes/userRoutes.js"; // Semi-colon added
+// Router Imports
+import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
 
 dotenv.config();
 
+// 1. App aur Server Define karein (Sequence fix)
 const app = express();
 const server = http.createServer(app);
 
-// SOCKET SETUP: Exporting 'io' fixes the controller crash
+// 2. SOCKET SETUP (Exporting 'io' is the key fix)
 export const userSocketMap = {}; 
 export const io = new Server(server, {
-    cors: { origin: "http://localhost:5173", credentials: true }
+    cors: { 
+        origin: ["http://localhost:5173", "https://your-app.netlify.app"], 
+        credentials: true 
+    }
 });
 
 export const getReceiverSocketId = (userId) => userSocketMap[userId];
@@ -33,19 +37,24 @@ io.on("connection", (socket) => {
     });
 });
 
+// 3. Middlewares (app define hone ke BAAD)
 app.use(express.json({ limit: "5mb" }));
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cors({ 
+    origin: ["http://localhost:5173", "https://your-app.netlify.app"], 
+    credentials: true 
+}));
 
-// Mounting Routes
+// 4. Routes Mount karein
 app.use("/api/auth", userRouter);      
 app.use("/api/messages", messageRouter); 
 
-// DB Connection
+// 5. DB Connection
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log("✅ MongoDB Connected Successfully"))
     .catch((err) => console.log("❌ MongoDB Connection Error:", err));
 
-// Start with 'server' instead of 'app'
-server.listen(process.env.PORT || 5000, () => {
-    console.log(`🚀 Server running on port ${process.env.PORT || 5000}`);
+// 6. Server Start
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
 });
