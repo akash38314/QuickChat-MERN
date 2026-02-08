@@ -1,87 +1,74 @@
-import React, { createContext, useState, useEffect, useContext, useCallback } from "react";
+import React, { createContext, useState, useCallback, useContext } from "react";
+import axios from "axios";
 import toast from "react-hot-toast";
-import { AuthContext } from "./AuthContext";
+
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"; 
+const API_URL = `${BASE_URL}/api`;
+
+const axiosInstance = axios.create({
+    baseURL: API_URL,
+    withCredentials: true,
+});
 
 export const ChatContext = createContext();
+
+export const useChat = () => useContext(ChatContext);
 
 export const ChatProvider = ({ children }) => {
     const [messages, setMessages] = useState([]);
     const [users, setUsers] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
-    const [unseenMessages, setUnseenMessages] = useState({}); // Badge logic
-    
-    const { socket, axios, authUser } = useContext(AuthContext);
+    const [isUsersLoading, setIsUsersLoading] = useState(false);
+    const [isMessagesLoading, setIsMessagesLoading] = useState(false);
 
-    const getUsers = async () => {
+    const getUsers = useCallback(async () => {
+        setIsUsersLoading(true);
+        const token = localStorage.getItem("token");
         try {
-            const { data } = await axios.get("/api/messages/users");
-            if (data.success) setUsers(data.users);
+            const { data } = await axiosInstance.get("/messages/users", {
+                headers: { token: token }
+            });
+            // Array check to prevent .map errors
+            setUsers(Array.isArray(data) ? data : (data.users || []));
         } catch (error) {
-            console.error("Failed to fetch users:", error);
+            toast.error("Failed to load users");
+        } finally {
+            setIsUsersLoading(false);
         }
-    };
+    }, []);
 
-    const getMessages = async (userId) => {
+    const getMessages = useCallback(async (userId) => {
+        setIsMessagesLoading(true);
+        const token = localStorage.getItem("token");
         try {
-            const { data } = await axios.get(`/api/messages/${userId}`);
-            if (data.success) setMessages(data.messages);
+            const { data } = await axiosInstance.get(`/messages/${userId}`, {
+                headers: { token: token }
+            });
+            setMessages(Array.isArray(data) ? data : []);
         } catch (error) {
-            toast.error("Error loading chat history");
+            toast.error("Failed to load chat");
+        } finally {
+            setIsMessagesLoading(false);
         }
-    };
+    }, []);
 
-    // Sending Logic for Text and Image
     const sendMessage = async (messageData) => {
+        const token = localStorage.getItem("token");
         try {
-            if (!selectedUser) return;
-            const { data } = await axios.post(`/api/messages/send/${selectedUser._id}`, messageData);
-            if (data.success) {
-                setMessages((prev) => [...prev, data.message]);
-            }
+            const { data } = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData, {
+                headers: { token: token }
+            });
+            setMessages((prev) => [...prev, data]);
         } catch (error) {
-            toast.error("Message delivery failed");
+            toast.error("Failed to send message");
         }
-    };
-
-    useEffect(() => {
-        if (authUser) getUsers();
-    }, [authUser]);
-
-    // Real-time Socket Listener Polish
-    useEffect(() => {
-        if (!socket) return;
-
-        const handleNewMessage = (msg) => {
-            // Check if message belongs to current chat
-            if (selectedUser?._id === msg.senderId) {
-                setMessages((prev) => [...prev, msg]);
-            } else {
-                // Update unseen count for other users
-                setUnseenMessages((prev) => ({
-                    ...prev,
-                    [msg.senderId]: (prev[msg.senderId] || 0) + 1
-                }));
-            }
-        };
-
-        socket.on("newMessage", handleNewMessage);
-        return () => socket.off("newMessage", handleNewMessage);
-    }, [socket, selectedUser]);
-
-    const value = {
-        messages,
-        users,
-        selectedUser,
-        setSelectedUser,
-        unseenMessages,
-        setUnseenMessages,
-        getUsers,
-        getMessages,
-        sendMessage
     };
 
     return (
-        <ChatContext.Provider value={value}>
+        <ChatContext.Provider value={{ 
+            users, messages, selectedUser, isUsersLoading, 
+            isMessagesLoading, getUsers, getMessages, setSelectedUser, sendMessage 
+        }}>
             {children}
         </ChatContext.Provider>
     );

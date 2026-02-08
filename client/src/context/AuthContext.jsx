@@ -1,9 +1,10 @@
-import React, { createContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useEffect, useState, useCallback, useContext } from "react";
 import axios from 'axios';
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 
-const BASE_URL = "http://localhost:5000"; 
+// IMPORTANT: Netlify deployment ke liye environment variable use karein
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"; 
 const API_URL = `${BASE_URL}/api`;
 
 const axiosInstance = axios.create({
@@ -13,6 +14,8 @@ const axiosInstance = axios.create({
 
 export const AuthContext = createContext();
 
+export const useAuth = () => useContext(AuthContext);
+
 export const AuthProvider = ({ children }) => {
     const [authUser, setAuthUser] = useState(null);
     const [onlineUsers, setOnlineUsers] = useState([]);
@@ -21,7 +24,7 @@ export const AuthProvider = ({ children }) => {
     const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
     const connectSocket = useCallback((userData) => {
-        if (!userData || socket?.connected) return;
+        if (!userData?._id || socket?.connected) return;
         const newSocket = io(BASE_URL, {
             query: { userId: userData._id },
         });
@@ -51,38 +54,18 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const login = async (state, credentials) => {
+    const login = async (action, credentials) => {
         try {
-            const { data } = await axiosInstance.post(`/auth/${state}`, credentials);
+            const { data } = await axiosInstance.post(`/auth/${action}`, credentials);
             if (data.success) {
                 localStorage.setItem("token", data.token);
-                setAuthUser(data.userData || data.user);
-                connectSocket(data.userData || data.user);
+                const user = data.userData || data.user;
+                setAuthUser(user);
+                connectSocket(user);
                 toast.success(data.message || "Success!");
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || "Login/Signup Failed");
-        }
-    };
-
-    // UPDATE PROFILE FUNCTION (Ye missing tha!)
-    const updateProfile = async (formData) => {
-        setIsUpdatingProfile(true);
-        const token = localStorage.getItem("token");
-        try {
-            const { data } = await axiosInstance.put("/auth/update-profile", formData, {
-                headers: { token: token }
-            });
-            if (data.success) {
-                setAuthUser(data.user);
-                toast.success("Profile Updated Successfully!");
-                return true;
-            }
-        } catch (error) {
-            toast.error(error.response?.data?.message || "Update failed");
-            return false;
-        } finally {
-            setIsUpdatingProfile(false);
+            toast.error(error.response?.data?.message || "Auth Failed");
         }
     };
 
@@ -95,20 +78,12 @@ export const AuthProvider = ({ children }) => {
         toast.success("Logged out");
     };
 
-    useEffect(() => {
-        checkAuth();
-    }, []);
+    useEffect(() => { checkAuth(); }, []);
 
     return (
         <AuthContext.Provider value={{ 
-            authUser, 
-            onlineUsers, 
-            socket, 
-            login, 
-            logout, 
-            isCheckingAuth, 
-            updateProfile, // Exported now
-            isUpdatingProfile 
+            authUser, onlineUsers, socket, login, logout, 
+            checkAuth, isCheckingAuth, updateProfile: null, isUpdatingProfile 
         }}>
             {children}
         </AuthContext.Provider>
