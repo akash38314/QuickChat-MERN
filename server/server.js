@@ -11,15 +11,21 @@ import messageRouter from "./routes/messageRoutes.js";
 
 dotenv.config();
 
-// 1. App aur Server Define karein (Sequence fix)
 const app = express();
 const server = http.createServer(app);
 
-// 2. SOCKET SETUP (Exporting 'io' is the key fix)
+// 1. LIVE URL DEFINITION
+// Yahan humne aapka live Netlify link add kar diya hai
+const allowedOrigins = [
+    "http://localhost:5173", 
+    "https://aesthetic-klepon-7aa9d7.netlify.app" 
+];
+
+// 2. SOCKET SETUP
 export const userSocketMap = {}; 
 export const io = new Server(server, {
     cors: { 
-        origin: ["http://localhost:5173", "https://your-app.netlify.app"], 
+        origin: allowedOrigins, 
         credentials: true 
     }
 });
@@ -37,14 +43,14 @@ io.on("connection", (socket) => {
     });
 });
 
-// 3. Middlewares (app define hone ke BAAD)
+// 3. Middlewares
 app.use(express.json({ limit: "5mb" }));
 app.use(cors({ 
-    origin: ["http://localhost:5173", "https://your-app.netlify.app"], 
+    origin: allowedOrigins, 
     credentials: true 
 }));
 
-// 4. Routes Mount karein
+// 4. Routes Mount
 app.use("/api/auth", userRouter);      
 app.use("/api/messages", messageRouter); 
 
